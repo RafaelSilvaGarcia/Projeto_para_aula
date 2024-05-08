@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+
+<html>
+<head>
+    <title>Pong_Suporte</title>
+    <style>
+        canvas{
+            border: 1px solid black;
+            background-color: black;
+        }
+        </style>
+</head>
+<body>
+      <canvas id="myCanvas" width="800px" height="600px"></canvas>
+    <script>
+        var canvas = document.getElementById("myCanvas");
+        var ctx = canvas.getContext("2d");
+        var clouds = [];
+        var ballPosX = 400;
+        var ballPosY = 530;
+        var ballAngle = Math.random() * 2 * Math.PI;
+        var ballRadius = 8;
+        var ballSpeed = 6;
+        var ballSpeedIncrement = 2; //valor em porcentagem //Este comentario comenta o comentario que diz que o valor é dito em porcentagem
+        var playerPosX = canvas.width / 2;
+        var playerPosY = canvas.height - 50;
+        var playerWidth = 100;
+        var playerHeight = 20;
+        var bricks = [];
+        var isBallInGame = false;
+        var brickRows = 6;
+        var brickColumns = 10;
+        var hearts = [];
+        var isPaused = false;
+        var isVictory = false;
+        var isGameOver = false;
+
+        canvas.addEventListener("mousemove", function(event){
+            playerPosX = event.clientX;
+        });
+
+        canvas.addEventListener("mousedown", function (event) {
+            isBallInGame = true;
+        });
+
+        class Brick {
+
+            constructor(x, y) {
+                this.width = 50;
+                this.height = playerHeight;
+                this.color = "rgb(255, 99, 71)"; // Cor vermelha para os tijolos
+                this.x = x;
+                this.y = y;
+                this.hp = 2;
+                this.collided = false; // Nova propriedade para controle de colisão
+            }
+
+            drawBrick() {
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.5)"; // Cor preta para a borda
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+                // Desenhar linhas horizontais dentro do tijolo
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.height / 3);
+                ctx.lineTo(this.x + this.width, this.y + this.height / 3);
+                ctx.moveTo(this.x, this.y + (2 * this.height) / 3);
+                ctx.lineTo(this.x + this.width, this.y + (2 * this.height) / 3);
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.stroke();
+
+                // Desenhar linhas verticais dentro do tijolo
+                ctx.beginPath();
+                ctx.moveTo(this.x + this.width / 4, this.y);
+                ctx.lineTo(this.x + this.width / 4, this.y + this.height);
+                ctx.moveTo(this.x + (2 * this.width) / 4, this.y);
+                ctx.lineTo(this.x + (2 * this.width) / 4, this.y + this.height);
+                ctx.moveTo(this.x + (3 * this.width) / 4, this.y);
+                ctx.lineTo(this.x + (3 * this.width) / 4, this.y + this.height);
+                ctx.strokeStyle = "rgba(0, 0, 0, 0.5)";
+                ctx.stroke();
+
+                ctx.font = "15px Arial"; // Reduz o tamanho da fonte
+                ctx.fillStyle = "white";
+                ctx.fillText(this.hp, this.x + this.width / 2 - 4, this.y + this.height / 2 + 5); // Ajusta a posição do texto
+            }
+        
+
+            looseHP(n){
+                this.hp -= n;
+            }
+
+            testHP() {
+                if (this.hp <= 0) {
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            }
+
+            testBallCollision(x, y, r) {
+                // Definindo uma área de colisão maior
+                if (
+                    x + r > this.x && 
+                    x - r < this.x + this.width &&
+                    y + r > this.y && 
+                    y - r < this.y + this.height
+                    ) 
+                {
+                    return true;
+                }
+                else 
+                {
+                    return false;
+                }
+            }
+        }
+
+        class Heart 
+        {
+            constructor(x, y) 
+            {
+                this.x = x;
+                this.y = y;
+                this.color = "red";
+                this.outline = "grey";
+            }
+            drawHeart() {
+                for (i = 0; i < hearts.length; i++) {
+                    ctx.save(); // Salva o estado do contexto
+                    ctx.beginPath();
+                    ctx.fillStyle = "red";
+
+                    // Desenha o corpo do coração
+                    let heartX = hearts[i].x;
+                    let heartY = hearts[i].y;
+                    let heartSize = 15;
+
+                    ctx.moveTo(heartX, heartY + heartSize / 2);
+                    ctx.quadraticCurveTo(heartX, heartY, heartX + heartSize / 2, heartY);
+                    ctx.quadraticCurveTo(heartX + heartSize, heartY, heartX + heartSize, heartY + heartSize / 2);
+                    ctx.quadraticCurveTo(heartX + heartSize, heartY, heartX + heartSize + heartSize / 2, heartY);
+                    ctx.quadraticCurveTo(heartX + 2 * heartSize, heartY, heartX + 2 * heartSize, heartY + heartSize / 2);
+                    ctx.quadraticCurveTo(heartX + 2 * heartSize, heartY + heartSize, heartX + heartSize, heartY + 2 * heartSize);
+                    ctx.quadraticCurveTo(heartX, heartY + heartSize, heartX, heartY + heartSize / 2);
+                    ctx.fill();
+
+                    // Aplica uma sombra para efeito 3D
+                    ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+                    ctx.shadowBlur = 10;
+
+                    // Desenha o topo do coração
+                    ctx.beginPath();
+                    ctx.moveTo(heartX, heartY + heartSize / 2);
+                    ctx.quadraticCurveTo(heartX + heartSize, heartY + 3 * heartSize / 2, heartX + 2 * heartSize, heartY + heartSize / 2);
+                    ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+                    ctx.fill();
+
+                    ctx.restore(); // Restaura o estado do contexto para remover a sombra
+
+                    // Desenha as bolinhas do coração
+                    ctx.beginPath();
+                    ctx.arc(heartX + heartSize / 2, heartY + heartSize / 4, 5, 0, Math.PI * 2);
+                    ctx.arc(heartX + 3 * heartSize / 2, heartY + heartSize / 4, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
+                    ctx.fill();
+            }
+        }
+    }
+
+        function CreateHeart(hp) {
+            for (i = 0; i < hp; i++) {
+                hearts[i] = new Heart(canvas.width - 150 + i * 40, 50)
+            }
+        }
+
+        function DrawHearts() {
+            for (i = 0; i < hearts.length; i++) {
+                hearts[i].drawHeart();
+                if (ballPosY > playerPosY + playerHeight){
+                hearts.splice(0, 1);
+                isBallInGame = false;
+                ballPosY = playerPosY + playerHeight + ballRadius; // Ajuste a posição da bola
+                ballPosX = playerPosX; // Reinicie a posição X da bola
+                }
+            }
+        }         
+        
+        function DrawPlayer() {
+            // Gradiente para o jogador
+            var playerGradient = ctx.createLinearGradient(playerPosX - playerWidth / 2, playerPosY, playerPosX + playerWidth / 2, playerPosY + playerHeight);
+            playerGradient.addColorStop(0, '#993399'); // Azul escuro
+            playerGradient.addColorStop(1, '#993399'); // Azul claro
+
+             // Limites do jogador
+            var playerLeftBound = playerWidth / 2;
+            var playerRightBound = canvas.width - playerWidth / 2;
+
+            // Ajuste a posição do jogador se estiver ultrapassando os limites
+            if (playerPosX < playerLeftBound) {
+                playerPosX = playerLeftBound;
+            } else if (playerPosX > playerRightBound) {
+                playerPosX = playerRightBound;
+            }
+
+            ctx.beginPath();
+            ctx.fillStyle = playerGradient;
+            ctx.fillRect(playerPosX - playerWidth / 2, playerPosY, playerWidth, playerHeight / 1.5);
+
+            // Sombra para efeito 3D
+            ctx.beginPath();
+            ctx.fillStyle = "rgba(0, 0, 0, 0.2)"; // Sombra preta com transparência
+            ctx.moveTo(playerPosX - playerWidth / 2 + 2, playerPosY + playerHeight);
+            ctx.lineTo(playerPosX + playerWidth / 2 + 2, playerPosY + playerHeight);
+            ctx.lineTo(playerPosX + playerWidth / 2, playerPosY + playerHeight - 5);
+            ctx.lineTo(playerPosX - playerWidth / 2, playerPosY + playerHeight - 5);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function testPlayerCollision(x, y, r) {
+            // Adicionando uma pequena margem ao redor do jogador
+            var marginX = 10;
+            var marginY = 10;
+    
+            return 
+            (
+                x + r > playerPosX - playerWidth / 2 - marginX &&
+                x - r < playerPosX + playerWidth / 2 + marginX &&
+                y + r > playerPosY - marginY &&
+                y - r < playerPosY + playerHeight + marginY
+            );
+        }
+
+        function DrawBall()
+            {
+
+            // Verificar colisão com os tijolos
+            if (bricks.length > 0) {
+                for (let i = 0; i < bricks.length; i++) {
+                    if (bricks[i].testBallCollision(ballPosX, ballPosY, ballRadius)) {
+
+                        bricks[i].collided = true;
+
+                        // Calcular o vetor normal do ponto de colisão
+                        let normalX = (ballPosX - (bricks[i].x + bricks[i].width / 2)) / (bricks[i].width / 2);
+                        let normalY = (ballPosY - (bricks[i].y + bricks[i].height / 2)) / (bricks[i].height / 2);
+
+                        // Calcular o novo ângulo da bola
+                        let incidentAngle = Math.atan2(-normalY, normalX);
+                        let reflectionAngle = 2 * incidentAngle - ballAngle;
+
+                        // Definir a nova direção da bola
+                        ballAngle = reflectionAngle;
+
+                        // Remover o tijolo se sua vida for menor ou igual a 0
+                        if (bricks[i].hp <= 0) {
+                            bricks.splice(i, 1);
+                }
+            }
+        }
+    }
+
+            //Rebate a esquerda
+            if (ballPosX < ballRadius){
+                ballAngle = Math.PI - ballAngle;
+            }
+            // Rebate a direita
+            if (ballPosX > canvas.width - ballRadius){
+                ballAngle = 3 * Math.PI - ballAngle;
+            }
+            // Rebate em cima e em baixo
+            let isTouchingPlayer = false;
+            if (
+                ballPosX > playerPosX - playerWidth / 2 - ballRadius &&
+                ballPosX < playerPosX + playerWidth / 2 + ballRadius &&
+                ballPosY > playerPosY - ballRadius &&
+                ballPosY < playerPosY + playerHeight + ballRadius) {
+
+                   ballPosY = playerPosY - ballRadius - 5;
+                   let distance = ballPosX - playerPosX;
+                   ballAngle = (((2 * Math.PI/3)/playerWidth) * distance) - Math.PI / 2;
+            }
+
+            if (ballPosY < ballRadius || ballPosY > canvas.height - ballRadius) {
+                ballAngle = 2 * Math.PI - ballAngle;
+            }
+
+            ballPosX += Math.cos(ballAngle) * ballSpeed;
+            ballPosY += Math.sin(ballAngle) * ballSpeed;
+            if (!isBallInGame) {
+                ballPosX = playerPosX;
+                ballPosY = playerPosY - ballRadius;
+            }
+            // Define a cor e o estilo do gradiente radial
+            var gradient = ctx.createRadialGradient(ballPosX, ballPosY, 0, ballPosX, ballPosY, ballRadius);
+            gradient.addColorStop(0, "rgba(128, 0, 128, 1)"); // Cor interna roxa
+            gradient.addColorStop(1, "rgba(64, 0, 64, 1)"); // Cor externa mais escura
+
+            ctx.beginPath();
+            ctx.fillStyle = gradient;
+            ctx.arc
+            (
+                ballPosX,
+                ballPosY,
+                ballRadius,
+                0,
+                2 * Math.PI
+            );
+            ctx.fill();
+
+            // Desenha uma borda preta para destacar a bola
+            ctx.beginPath();
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 1;
+            ctx.arc(
+                ballPosX,
+                ballPosY,
+                ballRadius,
+                0,
+                2 * Math.PI
+                );
+            ctx.stroke();
+
+            if (bricks.length > 0) {
+            for (i = 0; i < bricks.length; i++) {
+                if (bricks[i].testBallCollision(ballPosX, ballPosY, ballRadius)) {
+                    // Calcular o vetor normal do ponto de colisão
+                    var normalX = (ballPosX - (bricks[i].x + bricks[i].width / 2)) / (bricks[i].width / 2);
+                    var normalY = (ballPosY - (bricks[i].y + bricks[i].height / 2)) / (bricks[i].height / 2);
+
+                    // Calcular o novo ângulo da bola
+                    var incidentAngle = Math.atan2(-normalY, normalX);
+                    var reflectionAngle = 2 * incidentAngle - ballAngle;
+
+                    // Definir a nova direção da bola
+                    ballAngle = reflectionAngle;
+                
+                    // Remover o tijolo se a sua vida for menor ou igual a 0
+                if (bricks[i].hp <= 0) {
+                    bricks.splice(i, 1);
+                }
+            }
+        }
+    }
+}
+
+        function CreateBricks() {
+            var brickWidth = 50;
+            var brickHeight = playerHeight;
+            var horizontalPadding = 6; // Espaço horizontal entre os retângulos
+            var verticalPadding = 6; // Espaço vertical entre os retângulos
+            var totalBricksWidth = brickColumns * (brickWidth + horizontalPadding) - horizontalPadding; // largura total ocupada pelos retângulos
+            var startX = (canvas.width - totalBricksWidth) / 2; // Calcula a posição inicial para centralizar os retângulos
+            var startY = 150; // Ajusta a posição inicial vertical
+
+            for (i = 0; i < brickRows; i++) {
+                for (j = 0; j < brickColumns; j++) {
+                    var x = startX + j * (brickWidth + horizontalPadding); // Calcula a posição x do retângulo
+                    var y = startY + i * (brickHeight + verticalPadding); // Calcula a posição y do retângulo
+                    bricks.push(new Brick(x, y));
+                }
+            }
+        }
+
+        function DrawBricks(){
+            if (bricks.length > 0) {
+                for (i = 0; i < bricks.length; i++) {
+                    bricks[i].drawBrick();
+                    if (bricks[i].testBallCollision(
+                        ballPosX,
+                        ballPosY,
+                        ballRadius)) {
+                        if(ballSpeed < playerHeight / 2)
+                            ballSpeed *= 1 + ballSpeedIncrement / 100;
+                        bricks[i].looseHP(1);
+                        //Rebate esquerda
+                        if (ballPosX < bricks[i].x) {
+                            ballAngle = Math.PI - ballAngle;
+                            AudioListener 
+                        }
+                        //Rebate Direita
+                        else if (ballPosX > bricks[i].x + bricks[i].width) {
+                            ballAngle = 3 * ballAngle - ballAngle;
+                        }
+                        //Rebate cima e baixo
+                        if (ballPosY < bricks[i].y ||
+                            ballPosY > bricks[i].y + bricks[i].height) {
+                            ballAngle = 2 * Math.PI - ballAngle;
+                        }
+                        if (bricks[i].hp <= 0) {
+                            bricks.splice(i, 1);
+                        }
+                    }
+                }
+            }
+        }
+
+            //nuvem pica
+                // Função para desenhar uma nuvem
+                function drawCloud(x, y) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.bezierCurveTo(x + 20, y - 40, x + 70, y - 40, x + 90, y);
+                    ctx.bezierCurveTo(x + 120, y - 40, x + 160, y - 40, x + 180, y);
+                    ctx.bezierCurveTo(x + 220, y - 20, x + 260, y - 20, x + 280, y);
+                    ctx.bezierCurveTo(x + 320, y - 20, x + 350, y - 20, x + 380, y);
+                    ctx.bezierCurveTo(x + 430, y - 20, x + 430, y + 30, x + 380, y + 30);
+                    ctx.bezierCurveTo(x + 350, y + 30, x + 320, y + 30, x + 280, y + 30);
+                    ctx.bezierCurveTo(x + 260, y + 50, x + 220, y + 50, x + 180, y + 30);
+                    ctx.bezierCurveTo(x + 160, y + 50, x + 120, y + 50, x + 90, y + 30);
+                    ctx.bezierCurveTo(x + 70, y + 50, x + 20, y + 50, x, y + 30);
+                    ctx.closePath();
+                    ctx.fillStyle = "rgba(128, 128, 128, 0.3)"; // Rosa claro semi-transparente
+                    ctx.fill();
+                }
+
+                // Função para criar nuvens em posições aleatórias na tela
+                function createClouds() {
+                    for (var i = 0; i < 5; i++) {
+                        var x = Math.random() * canvas.width;
+                        var y = Math.random() * canvas.height / 2; // As nuvens estarão na parte superior da tela
+                        var cloud = { x: x, y: y };
+                        clouds.push(cloud);
+                    }
+                }
+
+                // Função para desenhar as nuvens
+                function drawClouds() {
+                    for (var i = 0; i < clouds.length; i++) {
+                        drawCloud(clouds[i].x, clouds[i].y);
+                    }
+                }
+
+                // Função para mover as nuvens horizontalmente
+                function moveClouds() {
+                    for (var i = 0; i < clouds.length; i++) {
+                        clouds[i].x += 0.5; // Velocidade de movimento das nuvens
+                        if (clouds[i].x > canvas.width) {
+                            clouds[i].x = -200; // Reposiciona a nuvem quando ela sair da tela
+                        }
+                    }
+                }
+
+            function DrawPauseScreen() {
+                // Desenhar a tela de pausa estilizada
+                ctx.fillStyle = "rgba(0, 0, 0, 0.8)"; // Cor escura semi-transparente
+                ctx.fillRect(0, 0, canvas.width, canvas.height); // Desenha um retângulo que cobre todo o canvas
+
+                // Mensagem de pausa
+                ctx.font = "30px Arial";
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.fillText("Jogo Pausado", canvas.width / 2, canvas.height / 2 - 20);
+
+                // Mensagem de reinício
+                ctx.font = "20px Arial";
+                ctx.fillText("Aperte R para reiniciar", canvas.width / 2, canvas.height / 2 + 20);
+             }
+
+
+         function Draw()
+        {
+            if (isPaused || isGameOver) {
+                 if (isPaused) {
+                    DrawPauseScreen();
+            } else if (isGameOver) {
+                drawGameOverScreen();
+            }
+            return;
+        }
+            // Verificar se o jogo está pausado
+            if (isPaused) {
+                DrawPauseScreen();
+                return;
+        }
+            // Verificar se todos os tijolos foram destruídos
+            if (bricks.length === 0 && hearts.length > 0) {
+                isVictory = true;
+                isPaused = false; // Pausar o jogo quando o jogador vencer
+
+                // Desenhar a tela de vitória
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Cor escura semi-transparente
+                ctx.fillRect(0, 0, canvas.width, canvas.height); // Desenha um retângulo que cobre todo o canvas
+                ctx.font = "30px Arial";
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.fillText("Você venceu!", canvas.width / 2, canvas.height / 2);
+
+                // Mensagem de reinício
+                ctx.font = "20px Arial";
+                ctx.fillText("Aperte R para reiniciar", canvas.width / 2, canvas.height / 2 + 20);
+
+                // Coordenadas centralizadas do rostinho
+                var faceX = canvas.width / 2 + 200;
+                var faceY = canvas.height / 2 + 20;
+
+                // Desenhar a carinha triste
+                ctx.beginPath();
+                ctx.arc(faceX, faceY, 20, 0, Math.PI * 2); // Centralizar o rostinho
+                ctx.fillStyle = "white";
+                ctx.fill();
+
+                // Olhos
+                ctx.beginPath();
+                ctx.arc(faceX - 10, faceY - 5, 4, 0, Math.PI * 2); // Ajuste na posição X do olho esquerdo
+                ctx.arc(faceX + 10, faceY - 5, 4, 0, Math.PI * 2); // Ajuste na posição X do olho direito
+                ctx.fillStyle = "black";
+                ctx.fill();
+
+                // Boca
+                ctx.beginPath();
+                ctx.arc(faceX, faceY + 10, 10, 0, Math.PI); // Ajuste na posição X da boca e definição da boca para baixo
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                return;
+        }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            DrawPlayer();
+            DrawBall();
+            drawClouds();
+            DrawBricks();
+            DrawHearts();
+            moveClouds();
+    }
+
+            //jogooo
+            function ResumeGame() {
+            isPaused = false;
+        }
+
+            // Adicionar um evento de teclado para pausar o jogo (por exemplo, pressionar a tecla P)
+            document.addEventListener("keydown", function(event) {
+                if (event.key === "p" || event.key === "P") {
+                    isPaused = !isPaused; // Alternar entre pausado e não pausado
+                } else if (event.key === "r" || event.key === "R") {
+                    // Reiniciar o jogo
+                    ResetGame();
+                } else if (event.key === "9") {
+                    // Vitória automática
+                    WinGame();
+                }
+            });
+
+            // Função para verificar se o jogador perdeu todas as vidas e não quebrou todos os tijolos
+            function checkGameOver() {
+                if (hearts.length === 0 && bricks.length > 0) {
+                    isGameOver = true;
+                    pauseGame(); // Pausa o jogo quando ocorre a derrota
+                }
+            }
+
+            // Função para desenhar a tela de derrota
+            function drawGameOverScreen() {
+                ctx.fillStyle = "rgba(0, 0, 0, 0.5)"; // Cor escura semi-transparente
+                ctx.fillRect(0, 0, canvas.width, canvas.height); // Desenha um retângulo que cobre todo o canvas
+                ctx.font = "30px Arial";
+                ctx.fillStyle = "white";
+                ctx.textAlign = "center";
+                ctx.fillText("Game Over", canvas.width / 2, canvas.height / 2);
+
+                // Mensagem de reinício
+                ctx.font = "20px Arial";
+                ctx.fillText("Aperte R para reiniciar", canvas.width / 2, canvas.height / 2 + 20);
+               
+                // Coordenadas centralizadas do rostinho
+                var faceX = canvas.width / 2 + 200;
+                var faceY = canvas.height / 2 + 20;
+
+                // Desenhar a carinha triste
+                ctx.beginPath();
+                ctx.arc(faceX, faceY, 20, 0, Math.PI * 2); // Centralizar o rostinho
+                ctx.fillStyle = "white";
+                ctx.fill();
+
+                // Olhos
+                ctx.beginPath();
+                ctx.arc(faceX - 10, faceY - 5, 4, 0, Math.PI * 2); // Ajuste na posição X do olho esquerdo
+                ctx.arc(faceX + 10, faceY - 5, 4, 0, Math.PI * 2); // Ajuste na posição X do olho direito
+                ctx.fillStyle = "black";
+                ctx.fill();
+
+                // Boca
+                ctx.beginPath();
+                ctx.arc(faceX, faceY + 10, 10, Math.PI, 0); // Ajuste na posição X da boca e definição da boca para baixo
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+
+            function ResetGame() {
+                // Reiniciar o estado do jogo
+                isPaused = false; // Retornar o jogo ao estado não pausado
+                isVictory = false; // Resetar o estado de vitória
+                isGameOver = false; // Resetar o estado de Game Over
+                hearts = []; // Esvaziar as vidas
+                CreateHeart(3); // Recriar as vidas iniciais
+                bricks = []; // Esvaziar os tijolos
+                CreateBricks(); // Recriar os tijolos
+                clouds = [];
+                createClouds();
+
+                playerPosX = canvas.width / 2;
+                playerPosY = canvas.height - 50;
+                ballPosX = canvas.width / 2;
+                ballPosY = canvas.height - 50
+                isBallInGame = false; // Garantir que a bola esteja parada
+            }
+
+            function WinGame() {
+                // Quebrar todos os tijolos instantaneamente
+                bricks = [];
+            }
+
+            // Adicionar evento de escuta de teclado para a tecla 8 (para ativar o game over)
+            document.addEventListener("keydown", function(event) {
+                if (event.key === "8") {
+                    isGameOver = true;
+                    isPaused = false; // Pausar o jogo quando o jogador perde
+                    DrawGameOverScreen(); // Desenhar a tela de game over
+                }
+            });
+            //jogo fim
+
+        CreateBricks();
+        CreateHeart(3);
+        setInterval(Draw, 20);
+        createClouds();
+
+    </script>
+
+<audio controls loop autoplay>
+    <source src="music.ogg" type="audio/ogg">
+    <source src="music.mp3" type="audio/mpeg">
+</audio>
+
+</body>
+</html>
